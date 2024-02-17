@@ -1,0 +1,22 @@
+{
+    "name": "authentication",
+    "version": "1.0.0",
+    "description": "",
+    "main": "app.js",
+    "author": "",
+    "license": "ISC",
+    "dependencies": {
+        "bcrypt": "5.0.1",
+        "body-parser": "^1.20.2",
+        "dotenv": "^16.4.2",
+        "express": "4.17.1",
+        "http": "^0.0.1-security",
+        "jsonwebtoken": "^9.0.2",
+        "mongoose": "^8.1.3",
+        "mysql2": "^3.9.1",
+        "nodemon": "2.0.7",
+        "socket.io": "^4.7.4",
+        "sqlite": "4.0.19",
+        "sqlite3": "5.0.2"
+    }
+}
