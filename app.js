@@ -1,81 +1,65 @@
 const express = require("express");
-const http = require("http");
-const socketIo = require("socket.io");
 const sqlite3 = require("sqlite3").verbose();
 
 const app = express();
-const server = http.createServer(app);
-const io = socketIo(server);
+const port = 4000;
 
-const PORT = process.env.PORT || 4000;
-
-// Connect to SQLite database
-const db = new sqlite3.Database(":memory:");
-
-// Create messages table
-db.serialize(() => {
-  db.run(
-    "CREATE TABLE messages (id INTEGER PRIMARY KEY AUTOINCREMENT, text TEXT, user TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)"
-  );
+// Create a new database file or connect to an existing one
+const db = new sqlite3.Database("./users.db", (err) => {
+  if (err) {
+    console.error(err.message);
+  } else {
+    console.log("Connected to the users database.");
+    // Create a users table if it does not exist
+    db.run(`
+      CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT NOT NULL,
+        email TEXT NOT NULL,
+        password TEXT NOT NULL
+      )
+    `);
+  }
 });
 
-// Handle WebSocket connections
-io.on("connection", (socket) => {
-  console.log("New client connected");
+// Middleware for parsing JSON body
+app.use(express.json());
 
-  // Send initial messages to client
-  db.all(
-    "SELECT * FROM messages ORDER BY timestamp DESC LIMIT 50",
-    (err, rows) => {
+// API endpoint for creating a new user
+app.post("/users", (req, res) => {
+  const { username, email, password } = req.body;
+
+  // Insert user data into the users table
+  db.run(
+    "INSERT INTO users (username, email, password) VALUES (?, ?, ?)",
+    [username, email, password],
+    function (err) {
       if (err) {
-        console.error(err);
-        return;
+        console.error(err.message);
+        res.status(500).send("Failed to insert user data.");
+      } else {
+        console.log(`User ${this.lastID} inserted successfully!`);
+        res.status(201).send("User created successfully.");
       }
-      const messages = rows.map((row) => row.text);
-      socket.emit("message", messages.reverse());
     }
   );
+});
 
-  // Send updated user list to all clients
-  io.emit(
-    "users",
-    Object.keys(io.sockets.connected).map(
-      (id) => io.sockets.connected[id].username
-    )
-  );
-
-  // Receive and broadcast messages
-  socket.on("sendMessage", (message) => {
-    const user = socket.username || "Anonymous";
-    const timestamp = new Date().toISOString();
-    db.run(
-      "INSERT INTO messages (text, user, timestamp) VALUES (?, ?, ?)",
-      [message, user, timestamp],
-      (err) => {
-        if (err) {
-          console.error(err);
-          return;
-        }
-        io.emit("message", [message]);
-      }
-    );
-  });
-
-  // Set username for the socket
-  socket.on("setUsername", (username) => {
-    socket.username = username;
-  });
-
-  // Handle disconnection
-  socket.on("disconnect", () => {
-    console.log("Client disconnected");
-    io.emit(
-      "users",
-      Object.keys(io.sockets.connected).map(
-        (id) => io.sockets.connected[id].username
-      )
-    );
+// API endpoint for getting all users
+app.get("/users", (req, res) => {
+  // Retrieve all rows from the users table
+  db.all("SELECT * FROM users", (err, rows) => {
+    if (err) {
+      console.error(err.message);
+      res.status(500).send("Failed to retrieve user data.");
+    } else {
+      console.log(`Retrieved ${rows.length} users.`);
+      res.status(200).json(rows);
+    }
   });
 });
 
-server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+// Start the server
+app.listen(port, () => {
+  console.log(`Server listening at http://localhost:${port}`);
+});
